@@ -87,7 +87,7 @@ app.post('/api/users/:_id/exercises', async (req,res)=>{
   }
 })
 
-app.get('/api/users/:_id/logs', async (req,res)=>{
+app.get('/api/users/:_id/logs', async (req, res) => {
   const userId = req.params._id;
 
   if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -101,14 +101,28 @@ app.get('/api/users/:_id/logs', async (req,res)=>{
   try {
     const user = await User.findById(userId);
     if (!user) {
-        return res.status(404).json({ error: 'User not found' });
+      return res.json({ error: 'User not found' });
     }
 
     let query = { userId: user._id };
     if (from) query.date = { ...query.date, $gte: from };
     if (to) query.date = { ...query.date, $lte: to };
 
-    let log = await Exercise.find(query).limit(limit || 0).exec();
+    let log = await Exercise.find(query).exec();
+
+    if (from) {
+      const fromDate = new Date(from);
+      log = log.filter(exercise => exercise.date >= fromDate);
+    }
+
+    if (to) {
+      const toDate = new Date(to);
+      log = log.filter(exercise => exercise.date <= toDate);
+    }
+
+    if (limit) {
+      log = log.slice(0, limit);
+    }
 
     log = log.map(exercise => ({
       description: exercise.description,
@@ -116,31 +130,16 @@ app.get('/api/users/:_id/logs', async (req,res)=>{
       date: exercise.date ? exercise.date.toDateString() : 'No date provided' // Handle null dates
     }));
 
-    if (from) {
-        const fromDate = new Date(from);
-        log = log.filter(exercise => exercise.date >= fromDate);
-    }
-
-    if (to) {
-        const toDate = new Date(to);
-        log = log.filter(exercise => exercise.date <= toDate);
-    }
-
-    if (limit) {
-        log = log.slice(0, limit);
-    }
-
     res.json({
-        _id: user._id,
-        username: user.username,
-        count: log.length,
-        log: log
+      _id: user._id,
+      username: user.username,
+      count: log.length,
+      log: log
     });
-  }catch (err) {
-      res.json({ error: err.message });
-    }
-})
-
+  } catch (err) {
+    res.json({ error: err.message });
+  }
+});
 const listener = app.listen(process.env.PORT || 3000, () => {
   console.log('Your app is listening on port ' + listener.address().port)
 })
